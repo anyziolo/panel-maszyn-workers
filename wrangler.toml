@@ -1,0 +1,32 @@
+name = "panel-maszyn"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+
+# Baza danych D1 - po utworzeniu (wrangler d1 create panel-maszyn-db)
+# wklej tu "database_id" ktore wrangler wypisze.
+[[d1_databases]]
+binding = "DB"
+database_name = "panel-maszyn-db"
+database_id = "24c632ba-50f4-474c-9653-49089915b50b"
+
+# Harmonogram sprawdzania ofert - co godzinę, tak jak dotychczasowy cron.
+[triggers]
+crons = ["0 * * * *"]
+
+# Zwiększony limit czasu CPU dla scheduled/manual scrape (wiele portali +
+# stron do pobrania w jednym przebiegu). Jeśli konto jest na planie Free,
+# ten limit może być ignorowany/ograniczony przez Cloudflare - w takim
+# wypadku warto zmniejszyć liczbę stron na wyszukiwanie w config.js.
+
+
+[vars]
+# Nie-sekretne ustawienia (mogą być tu w kodzie, nic wrażliwego).
+AUTO_REFRESH_SECONDS = "60"
+HIGHLIGHT_HOURS = "24"
+MAX_OFFERS = "300"
+
+# Sekrety (hasła, klucz sesji) - NIE wpisuj ich tutaj. Ustaw komendami:
+#   wrangler secret put BASIC_AUTH_USERNAME
+#   wrangler secret put BASIC_AUTH_PASSWORD
+#   wrangler secret put SESSION_SECRET
+# (dokładne instrukcje w README-DEPLOY.md)
