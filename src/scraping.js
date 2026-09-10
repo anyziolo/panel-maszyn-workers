@@ -31,13 +31,10 @@ const HOURS_RE = new RegExp(`(${HOURS_NUMBER_RE_SRC})\\s?(${HOURS_UNIT_RE_SRC})\
 
 const NEXT_PAGE_HINTS = ["następna", "nastepna", "next", "dalej", "»", "›"];
 
-export function findHoursNear(tag) {
-  let node = tag;
-  for (let i = 0; i < 5 && node; i++) {
-    const text = getText(node);
+export function findHoursNear(tag, pattern) {
+  for (const text of nearbyOfferTextLevels(tag, pattern, 5)) {
     const m = HOURS_RE.exec(text);
     if (m) return m[1].replace(/[ .,]/g, "");
-    node = node.parent;
   }
   return null;
 }
@@ -76,10 +73,8 @@ function findAllPriceMatches(text) {
   return matches;
 }
 
-export function findPriceNear(tag) {
-  let node = tag;
-  for (let i = 0; i < 5 && node; i++) {
-    const text = getText(node);
+export function findPriceNear(tag, pattern) {
+  for (const text of nearbyOfferTextLevels(tag, pattern, 5)) {
     const candidates = findAllPriceMatches(text);
     if (candidates.length) {
       for (const c of candidates) {
@@ -88,15 +83,12 @@ export function findPriceNear(tag) {
       }
       return candidates[0].text;
     }
-    node = node.parent;
   }
   return null;
 }
 
-export function findYearNear(tag, priceText) {
-  let node = tag;
-  for (let i = 0; i < 5 && node; i++) {
-    const text = getText(node);
+export function findYearNear(tag, priceText, pattern) {
+  for (const text of nearbyOfferTextLevels(tag, pattern, 5)) {
     let m;
     const g = new RegExp(YEAR_RE_G.source, "g");
     while ((m = g.exec(text)) !== null) {
@@ -104,7 +96,6 @@ export function findYearNear(tag, priceText) {
       if (priceText && priceText.includes(candidate)) continue;
       return candidate;
     }
-    node = node.parent;
   }
   return null;
 }
@@ -245,6 +236,20 @@ export function extractOffers(html, searchCfg, currentUrl) {
     groups.get(absUrl).push(a);
   }
 
+  // Male pomocnicze: sprobuj funkcje "znajdz w poblizu X" dla KAZDEGO linku
+  // z grupy (nie tylko tego wybranego na tytul) i wez pierwszy niepusty
+  // wynik. To zabezpieczenie przed tym, ze na prawdziwej stronie miniaturka
+  // i tytul moga byc zagniezdzone na innej glebokosci - jesli wspinanie sie
+  // od jednego z nich nie dosiegnie np. kraju/ceny (bo po drodze trafi na
+  // granice karty), moze dosiegnie od drugiego.
+  function firstFromAnyAnchor(anchors, fn) {
+    for (const anchor of anchors) {
+      const v = fn(anchor);
+      if (v !== null && v !== undefined && v !== "") return v;
+    }
+    return null;
+  }
+
   for (const [absUrl, anchors] of groups) {
     // Wybierz link z niepustym tekstem (tytul) - jesli takiego nie ma
     // (np. sama miniaturka bez alt), wez pierwszy z listy.
@@ -262,12 +267,13 @@ export function extractOffers(html, searchCfg, currentUrl) {
     }
     if (!title) title = "(bez tytułu - sprawdź link)";
 
-    if (isLocationExcluded(a, pattern)) continue;
+    if (anchors.some((anchor) => isLocationExcluded(anchor, pattern))) continue;
 
-    const price = findPriceNear(a);
-    const year = findYearInText(title) || findYearNear(a, price);
-    const location = findLocationNear(a, pattern);
-    const hours = findHoursNear(a);
+    const price = firstFromAnyAnchor(anchors, (anchor) => findPriceNear(anchor, pattern));
+    const year =
+      findYearInText(title) || firstFromAnyAnchor(anchors, (anchor) => findYearNear(anchor, price, pattern));
+    const location = firstFromAnyAnchor(anchors, (anchor) => findLocationNear(anchor, pattern));
+    const hours = firstFromAnyAnchor(anchors, (anchor) => findHoursNear(anchor, pattern));
 
     offers.push({ url: absUrl, title, price, year, location, hours });
   }
