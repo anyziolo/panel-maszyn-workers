@@ -57,6 +57,10 @@ export const SEARCHES = [
     urlPattern: /\/-\/sale\/wheel-excavators\/[^"'#\s]+--\d+/,
     base: "https://machineryline.com",
     pages: 2,
+    // MachineryLine pokazuje ceny wylacznie w $/€, nigdy w PLN - jesli
+    // "znajdziemy" PLN w poblizu takiej oferty, to na 100% jest to jakis
+    // inny fragment strony (np. widget reklamowy), a nie prawdziwa cena.
+    excludeCurrencies: ["PLN"],
   },
   {
     id: "machineryline_ladowarki_kolowe",
@@ -67,6 +71,7 @@ export const SEARCHES = [
     urlPattern: /\/-\/sale\/wheel-loaders\/[^"'#\s]+--\d+/,
     base: "https://machineryline.com",
     pages: 2,
+    excludeCurrencies: ["PLN"],
   },
 ];
 

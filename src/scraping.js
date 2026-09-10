@@ -18,6 +18,23 @@ export const PRICE_AFTER_RE = new RegExp(`(${PRICE_NUMBER_RE_SRC})\\s?(${CURRENC
 export const PRICE_BEFORE_RE = new RegExp(`(${CURRENCY_RE_SRC})\\s?(${PRICE_NUMBER_RE_SRC})`, "i");
 
 const NET_LABEL_RE = /netto|\bnett\b|\bnet\b/i;
+const CURRENCY_TOKEN_RE = new RegExp(CURRENCY_RE_SRC, "i");
+
+// Rozpoznaje walute znalezionego fragmentu ceny - uzywane do odfiltrowania
+// walut, ktore NIE wystepuja na danym portalu (patrz excludeCurrencies w
+// config.js). Np. na MachineryLine ceny sa w $/€, nigdy w PLN - jesli
+// "znajdziemy" PLN w poblizu takiej oferty, to prawie na 100% jest to jakis
+// inny, niezwiazany fragment strony (np. widget reklamowy/finansowy), a nie
+// prawdziwa cena tej oferty.
+function currencyOf(priceText) {
+  const m = CURRENCY_TOKEN_RE.exec(priceText || "");
+  if (!m) return null;
+  const tok = m[0].toLowerCase();
+  if (tok === "pln" || tok === "zł" || tok === "zl") return "PLN";
+  if (tok === "eur" || tok === "€") return "EUR";
+  if (tok === "usd" || tok === "$") return "USD";
+  return null;
+}
 
 const YEAR_RE = /\b(19[5-9]\d|20[0-3]\d)\b/;
 const YEAR_RE_G = /\b(19[5-9]\d|20[0-3]\d)\b/g;
@@ -73,9 +90,12 @@ function findAllPriceMatches(text) {
   return matches;
 }
 
-export function findPriceNear(tag, pattern) {
+export function findPriceNear(tag, pattern, excludeCurrencies) {
   for (const text of nearbyOfferTextLevels(tag, pattern, 5)) {
-    const candidates = findAllPriceMatches(text);
+    let candidates = findAllPriceMatches(text);
+    if (excludeCurrencies && excludeCurrencies.length) {
+      candidates = candidates.filter((c) => !excludeCurrencies.includes(currencyOf(c.text)));
+    }
     if (candidates.length) {
       for (const c of candidates) {
         const window = text.slice(Math.max(0, c.start - 20), c.end + 20);
@@ -269,7 +289,7 @@ export function extractOffers(html, searchCfg, currentUrl) {
 
     if (anchors.some((anchor) => isLocationExcluded(anchor, pattern))) continue;
 
-    const price = firstFromAnyAnchor(anchors, (anchor) => findPriceNear(anchor, pattern));
+    const price = firstFromAnyAnchor(anchors, (anchor) => findPriceNear(anchor, pattern, searchCfg.excludeCurrencies));
     const year =
       findYearInText(title) || firstFromAnyAnchor(anchors, (anchor) => findYearNear(anchor, price, pattern));
     const location = firstFromAnyAnchor(anchors, (anchor) => findLocationNear(anchor, pattern));
