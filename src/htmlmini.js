@@ -128,20 +128,26 @@ export function findFirstImg(node) {
   return found;
 }
 
-// Ile linkow-ofert (pasujacych do wzorca URL) jest w poddrzewie tego wezla -
-// uzywane, zeby wiedziec kiedy podczas chodzenia w gore drzewa wyszlismy
-// poza jedna karte oferty (patrz scraping.js).
+// Ile ROZNYCH ofert (unikalnych adresow pasujacych do wzorca URL) jest w
+// poddrzewie tego wezla - uzywane, zeby wiedziec kiedy podczas chodzenia w
+// gore drzewa wyszlismy poza jedna karte oferty (patrz scraping.js).
+//
+// WAZNE: liczymy UNIKALNE href, nie liczbe znacznikow <a> - typowa karta
+// oferty ma DWA linki do TEJ SAMEJ oferty (miniaturka zdjecia + tytul), co
+// przy liczeniu samych znacznikow dawaloby falszywe "2 oferty" juz na
+// pierwszym poziomie i przerywalo wspinanie sie po drzewie zanim dotarlismy
+// do np. tekstu z krajem, ktory jest kilka poziomow wyzej w tej samej karcie.
 export function countMatchingLinks(node, pattern) {
-  let count = 0;
+  const seen = new Set();
   (function walk(n) {
-    if (count > 1) return;
+    if (seen.size > 1) return;
     if (n.type === "element") {
-      if (n.tag === "a" && n.attrs.href && pattern.test(n.attrs.href)) count++;
+      if (n.tag === "a" && n.attrs.href && pattern.test(n.attrs.href)) seen.add(n.attrs.href);
       for (const c of n.children || []) {
-        if (count > 1) return;
+        if (seen.size > 1) return;
         walk(c);
       }
     }
   })(node);
-  return count;
+  return seen.size;
 }

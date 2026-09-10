@@ -218,8 +218,18 @@ function findNextPageUrl(root, currentUrl) {
 export function extractOffers(html, searchCfg, currentUrl) {
   const root = parseHtml(html);
   const pattern = searchCfg.urlPattern;
-  const seenUrls = new Set();
   const offers = [];
+
+  // Jedna karta oferty potrafi miec DWA (albo wiecej) linkow <a> wskazujacych
+  // na TEN SAM adres - typowo miniaturka zdjecia (bez tekstu) i tytul (z
+  // tekstem). Jesli wezmiemy "pierwszy link z tym adresem" i akurat
+  // miniaturka wystepuje w kodzie strony PRZED tytulem, to caly dalszy
+  // odczyt (tytul, cena, rok, kraj, godziny) byl liczony wzgledem
+  // miniaturki - bez tekstu - co dawalo puste/zle dane. Zeby tego uniknac:
+  // najpierw grupujemy WSZYSTKIE linki po znormalizowanym adresie, a
+  // dopiero potem z kazdej grupy wybieramy najlepszy (majacy tekst) link
+  // jako punkt odniesienia.
+  const groups = new Map(); // absUrl -> [anchor, anchor, ...] w kolejnosci wystapienia
 
   for (const a of findAllAnchors(root)) {
     const href = a.attrs.href;
@@ -231,13 +241,24 @@ export function extractOffers(html, searchCfg, currentUrl) {
       continue;
     }
     absUrl = absUrl.split("#")[0];
-    if (seenUrls.has(absUrl)) continue;
-    seenUrls.add(absUrl);
+    if (!groups.has(absUrl)) groups.set(absUrl, []);
+    groups.get(absUrl).push(a);
+  }
+
+  for (const [absUrl, anchors] of groups) {
+    // Wybierz link z niepustym tekstem (tytul) - jesli takiego nie ma
+    // (np. sama miniaturka bez alt), wez pierwszy z listy.
+    const a = anchors.find((anchor) => getText(anchor)) || anchors[0];
 
     let title = getText(a);
     if (!title) {
-      const img = findFirstImg(a);
-      if (img) title = (img.attrs.alt || "").trim();
+      for (const anchor of anchors) {
+        const img = findFirstImg(anchor);
+        if (img && (img.attrs.alt || "").trim()) {
+          title = img.attrs.alt.trim();
+          break;
+        }
+      }
     }
     if (!title) title = "(bez tytułu - sprawdź link)";
 
